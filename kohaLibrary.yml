@@ -1,0 +1,145 @@
+---
+- name: Ten10 Library Installation
+  hosts: mygroup
+  remote_user: ubuntu
+  become: true
+  vars:
+    ansible_ssh_private_key_file: /home/myo/Desktop/ansible/ansibleKey.pem
+  tasks:
+    - name: Ping
+      ping:
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Upgrade packages
+      apt:
+        upgrade: yes
+
+    - name: Add Koha repository key
+      apt_key:
+        url: http://debian.koha-community.org/koha/gpg.asc
+
+    - name: Add Koha repository
+      apt_repository:
+        repo: 'deb http://debian.koha-community.org/koha stable main'
+        state: present
+
+    - name: Install Koha Common Package and Dependencies
+      apt:
+        name:
+          - koha-common
+          - libapache2-mod-perl2
+          - libxml-libxml-perl
+          - libxml-libxslt-perl
+          - libdatetime-format-builder-perl
+        state: present
+
+    - name: Install MariaDB server
+      apt:
+        name: mariadb-server
+        state: present
+
+    - name: Enable Apache rewrite module
+      apache2_module:
+        state: present
+        name: rewrite
+
+    - name: Enable Apache2 modules
+      apache2_module:
+        state: present
+        name: "{{ item }}"
+      loop:
+        - proxy
+        - proxy_http
+    
+    - name: Enable cgi module
+      community.general.apache2_module:
+        state: present
+        name: cgi
+
+
+
+
+    - name: Create koha database for ten10librarytesttwo
+      shell: koha-create --create-db ten10librarytesttwo
+
+    - name: Add VirtualHost configuration for OPAC and Intranet
+      blockinfile:
+        path: /etc/apache2/sites-available/ten10librarytesttwo.conf
+        block: |
+          Listen 7001
+          Listen 7002
+
+          <VirtualHost *:7001>
+            ServerName opac.mydomain.com
+            ProxyPass / http://localhost:8080/
+            ProxyPassReverse / http://localhost:8080/
+          </VirtualHost>
+
+          <VirtualHost *:7002>
+            ServerName intranet.mydomain.com
+            ProxyPass / http://localhost:8081/
+            ProxyPassReverse / http://localhost:8081/
+          </VirtualHost>
+      notify: restart apache
+
+    - name: Enable Koha site
+      command: a2ensite ten10librarytesttwo.conf
+      become: true
+
+    #- name: Start zebra server for ten10librarytesttwo
+    #  shell: koha-zebra --start ten10librarytesttwo
+
+    #- name: Create cronjobs for ten10librarytesttwo
+    #  shell: koha-create-cronjobs ten10librarytesttwo
+
+    - name: Restart Apache2 service
+      service:
+        name: apache2
+        state: restarted
+
+    - name: Install python3-lxml
+      apt:
+        name: python3-lxml
+        state: present
+        
+    - name: Add OPACBaseURL and IntranetBaseURL to koha-conf.xml file
+      xml:
+        path: /etc/koha/sites/ten10librarytesttwo/koha-conf.xml
+        xpath: /yazgfs/config
+        add_children:
+          - OPACBaseURL: "http://{{ ansible_host }}:7001"
+          - IntranetBaseURL: "http://{{ ansible_host }}:7002/"
+
+    - name: Restart memcached service
+      service:
+        name: memcached
+        state: restarted
+  
+    - name: Start koha-common service
+      service:
+        name: koha-common
+        state: started
+
+    - name: Restart Koha services and check status
+      systemd:
+        name: koha-common
+        state: restarted
+
+    - name: Enable headers and proxy_http apache modules
+      community.general.apache2_module:
+        state: present
+        name: "{{ item }}"
+      loop:
+        - headers
+        - proxy_http
+
+  handlers:
+    - name: restart apache
+      service:
+        name: apache2
+        state: restarted
+  
+  

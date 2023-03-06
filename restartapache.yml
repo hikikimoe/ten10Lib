@@ -1,0 +1,13 @@
+---
+- name: Trying Again
+  hosts: mygroup
+  remote_user: ubuntu
+  become: true
+  vars:
+    ansible_ssh_private_key_file: /home/myo/Desktop/ansible/ansibleKey.pem
+  tasks:
+    - name: Restart Apache
+      become: yes
+      service:
+        name: apache2
+        state: restarted

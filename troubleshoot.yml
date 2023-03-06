@@ -1,0 +1,52 @@
+---
+- name: Troubleshooting
+  hosts: mygroup
+  remote_user: ubuntu
+  become: true
+  vars:
+    ansible_ssh_private_key_file: /home/myo/Desktop/ansible/ansibleKey.pem
+  tasks:
+    - name: Ping
+      ping:
+    - name: Enable Koha instance
+      become: yes
+      command: koha-enable ten10librarytesttwo
+
+    - name: Check Koha worker status
+      become: yes
+      command: koha-worker --status ten10librarytesttwo
+
+    #- name: Start Koha worker
+    #  become: yes
+    #  command: koha-worker --start ten10librarytesttwo
+
+    - name: Restart Koha worker
+      become: yes
+      command: koha-worker --restart ten10librarytesttwo
+
+    - name: Start Koha Zebra daemon
+      become: yes
+      command: koha-zebra --restart ten10librarytesttwo
+
+
+    - name: Enable Koha Plack daemon
+      become: yes
+      command: koha-plack --restart ten10librarytesttwo
+
+  handlers:
+    - name: restart apache
+      service:
+        name: apache2
+        state: restarted
+
+    - name: Enable Apache modules and site
+      become: yes
+      apache2_module:
+        state: present
+        name: deflate
+        
+    - name: Enable Apache site
+      become: yes
+      apache2_module:
+        state: enabled
+        name: ten10librarytesttwo
